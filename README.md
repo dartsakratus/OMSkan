@@ -39,3 +39,7 @@ ustalić numery dla wszystkich plików, następnie zapisać gotowe pliki.
 7. Do cięcia plików z finału nie należy używać chatugpt.
 8. Gotowe pliki będą w folderze "ready_files". 
 9. Należy wrzucić gotowe pliki do systemu w zakładce "Wgraj prace".
+
+Uruchamianie na WSLu:
+TBD
+Na koniec użyj export DISPLAY=:0

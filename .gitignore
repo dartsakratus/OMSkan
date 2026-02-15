@@ -1,0 +1,12 @@
+__pycache__
+__pycache__/*
+cmake-3.31.5
+cmake-3.31.5/*
+input_files/*
+! input_files/
+ready_files/*
+! ready_files/
+tmp_files/*
+! tmp_files
+nazwa_venv/*
+TODO.txt

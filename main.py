@@ -5,8 +5,6 @@ import tkinter as tk
 from tkinter import ttk
 from PIL import Image, ImageTk
 from PyPDF2 import PdfMerger
-# Zakładam, że `gpt` to lokalny moduł, którego tutaj nie definiujemy, ale jest wymagany.
-from gpt import get_response
 
 # Ścieżki do katalogów z plikami wejściowymi i wyjściowymi
 input_directory = './tmp_files'
@@ -19,6 +17,7 @@ if len(sys.argv) != 2:
     sys.exit(1)
 
 district = sys.argv[1]
+debug_flag = 0
 if district not in districts:
     print('District not found')
     sys.exit(1)
@@ -55,7 +54,6 @@ def update_annotations_csv(image_path, zadanie, numer_ucznia):
             file.write(f'{image_path_safe},{district},{zadanie},{numer_ucznia}\n')
     finally:
         annotations_lock.release()
-    create_files(image_path)
 
 def update_table():
     # Słownik do przechowywania informacji o plikach i ich danych
@@ -92,37 +90,10 @@ def update_table():
     for img in existing_rows:
         if img not in dic:
             tabela.delete(existing_rows[img])
-        
-
-def gpt_one():
-    global district
-    # read current image
-    selected_item = tabela.focus()
-    item = tabela.item(selected_item)
-    image_path = item['values'][0]
-    district, number, problem = get_response(input_directory, district, image_path)
-    problem, number = int(problem), int(number)
     
-    tabela.item(selected_item, values=(image_path, district, problem, number))
-    update_annotations_csv(image_path, problem, number)
-
-def gpt_all():
-    image_paths = [tabela.item(row)['values'][0] for row in tabela.get_children() if tabela.item(row)['values'][1] == '']
-    def gpt_one_wrapper(image_path):
-        global district
-        district, number, problem = get_response(input_directory, district, image_path)
-        print(district, number, problem)
-        problem = int(problem)
-        number = int(number)
-        update_annotations_csv(image_path,  problem, number)
-        # update table
-    
-    threads = [threading.Thread(target=gpt_one_wrapper, args=(image_path,)) for image_path in image_paths]
-    for thread in threads:
-        thread.start()
-        thread.join()
-        update_table()
-    
+def change_debug():
+    global debug_flag
+    debug_flag=1-debug_flag
 
 def show_image(_, elem=None):
     selected_item = tabela.focus()
@@ -140,6 +111,9 @@ def show_image(_, elem=None):
     # Wczytaj i przeskaluj obrazek
     image = Image.open(image_path)
     image = image.resize((600, 800))
+    if debug_flag:
+        image = image.crop((image.width-200, 0, image.width, 200))
+        image = image.resize((400, 400))
     photo = ImageTk.PhotoImage(image)
     
     right_label.config(image=photo)
@@ -150,8 +124,7 @@ def show_image(_, elem=None):
         entry_zadanie.insert(0, item['values'][2])
     entry_numer_ucznia.delete(0, tk.END)
     entry_numer_ucznia.insert(0, item['values'][3])
-    
-    
+
 
 def create_files(filename):
     annotations_lock.acquire()
@@ -171,7 +144,7 @@ def create_files(filename):
             break
     files = []
     for line in lines:
-        fname, okreg1, zadanie1, numer_ucznia1 = '', '', '', ''
+        fname, okreg1, zadanie1, numer_ucznia1 = line.strip().split(',')
         fname = fname[:-4] + '.pdf'
         if okreg1 == okreg and zadanie1 == zadanie and numer_ucznia1 == numer_ucznia:
             files.append(input_directory + '/' + district + '/' + fname)
@@ -248,16 +221,12 @@ obrazki = [ ( img, dic[img][0], dic[img][1], dic[img][2]) for img in sorted_file
 for obrazek in obrazki:
     tabela.insert('', tk.END, values=obrazek)
 
-# przycisk do startu sczytywania
-start_button = tk.Button(root, text="Rozpocznij szczytywanie chatemGPT", command=lambda: gpt_all())
-start_button.pack(side=tk.TOP)
-
-start_button = tk.Button(root, text="Sczytaj obecne", command=lambda: gpt_one())
-start_button.pack(side=tk.TOP)
-
-
 files_button = tk.Button(root, text="Stwórz pliki wyjściowe", command=lambda: create_all_files())
 files_button.pack(side=tk.TOP)
+
+debug_button = tk.Button(root, text="Zmień widok", command=lambda: change_debug())
+debug_button.pack(side=tk.TOP)
+
 
 
 # formularz z wyborem okręgu, zadania i numeru ucznia
@@ -297,12 +266,20 @@ def process_selection():
     image_path = tabela.item(next_item)['values'][0]
     show_image(None, image_path)
     
+def next_solution():
+    problem_number=int(entry_numer_ucznia.get())+1
+    entry_numer_ucznia.delete(0, tk.END)
+    entry_numer_ucznia.insert(0, str(problem_number))
 
 confirm_button = tk.Button(form_frame, text="Zatwierdź", command=process_selection)
 confirm_button.pack(side=tk.TOP)
 
+next_solution_button = tk.Button(form_frame, text="+1 (q)", command=next_solution)
+next_solution_button.pack(side=tk.TOP)
+
 # if enter
 root.bind('<Return>', lambda event: process_selection())
+root.bind('q', lambda event: next_solution())
 
 frame.pack(fill=tk.BOTH, expand=True)
 
